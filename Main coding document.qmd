@@ -1,0 +1,400 @@
+---
+title: "Main coding document"
+format: html
+editor: visual
+---
+
+## Document Introduction
+
+Libraries needed for functions.
+
+
+### QOL Functions
+
+This contains the message function and time related code. 
+
+```{r Message function}
+
+#' Message function to document script progress and report important steps.
+#' Some setup is required before this function works. 
+file_name <- "folder/progress_report_Dec12_2024.txt"
+
+# Check if the file exists
+if (file.exists(file_name)) {
+  # If it exists, remove it to clear its contents
+  file.remove(file_name)
+}
+
+# Create a new (empty) file
+file.create(file_name)
+
+# Enables messages to be appended to a file for review later
+write_to_file <- TRUE
+
+#' Description as to how the function works
+#' If 'write_to_file' is TRUE, the function will look for a file_name and write the messages to the console and to the file. If FALSE, only messages will be written to the console. 
+
+message_func <- function(...) {
+  
+  # Concatenate all '...' arguments into a single string
+  txt <- paste(..., collapse = " ")
+  
+  # Look for 'file_name' in the global environment if not provided as an argument
+  
+  if (exists("write_to_file", envir = .GlobalEnv)) {
+    write_to_file <- get("write_to_file", envir = .GlobalEnv)
+  } else {
+    write_to_file = FALSE
+  }
+  
+  if (exists("write_only_to_file", envir = .GlobalEnv)) {
+    write_only_to_file <- get("write_only_to_file", envir = .GlobalEnv)
+  } else {
+    write_only_to_file <- FALSE
+  }
+  
+  if (exists("file_name", envir = .GlobalEnv)) {
+    file_name <- get("file_name", envir = .GlobalEnv)
+  } else if (write_to_file == T || write_only_to_file == T) {
+    # Stop if file_name is needed but doesn't exist
+    stop("Please define 'file_name' in the global environment to save the output.")
+  }
+  
+  # Write to file if needed
+  if (write_to_file == T || write_only_to_file == T) {
+    cat(txt, file = file_name, append = TRUE)
+  }
+  
+  # Output to console if not exclusively writing to file
+  if (!exists("write_only_to_file") || !write_only_to_file == T) {
+    cat(txt, "\n")
+  }
+}
+
+#' Example function
+message_func("> Starting daily cross-validation code_________________________",
+             "\n")
+#' The "\n" is to denote a line break. This could be incorporated into the function in the future. 
+
+#' This function can be combined with a timer function to denote how long something took to run.
+
+#' For example, 
+
+t_start_master <- Sys.time()
+
+# Function goes here. I used sleep for example purposes
+Sys.sleep(0.5)
+
+t_end <- as.double(difftime(Sys.time(), t_start_master))
+
+t_unit <- units(difftime(Sys.time(), t_start_master))
+
+message_func("> Daily analysis finished in:",round(t_end,digits = 2),t_unit,"\n",
+        "   Setting 'run_cv_tests_daily' back to 'FALSE'","\n","\n")
+
+
+```
+
+```{r Flatten function}
+#' Function to flatten a nested list into a dataframe
+#' NOTE: Some changes need to be made depending on your list structure
+#' Where "RMSE|MAE|Resample|Rsquared" is, you need to specify some column names where the function determines the end of list is. 
+
+flatten_list <- function(lst, parent_name = NULL) {
+  # Initialize an empty list to store dataframes
+  result <- list()
+  
+  # Iterate over each element in the list
+  for (name in names(lst)) {
+    value <- lst[[name]]
+    
+    # Construct the new parent name based on the current level
+    new_parent_name <- if (is.null(parent_name)) { 
+      name 
+    } else {
+      if (any(grepl("RMSE|MAE|Resample|Rsquared", name))) {
+        parent_name  # Keep the current parent name if it matches metrics
+      } else {
+        paste(parent_name, name, sep = "_")  # Otherwise, append
+      }
+    }
+    
+    # Check if the element is a list with only numeric keys
+    if (is.list(value) && all(sapply(names(value), 
+                                     function(x) !is.na(suppressWarnings(as.numeric(x)))))) {
+      # If so, create a dataframe for each numeric key-value pair
+      for (num_name in names(value)) {
+        df <- data.frame(
+          parent = new_parent_name,
+          metric = as.numeric(num_name),
+          value = value[[num_name]],
+          stringsAsFactors = FALSE
+        )
+        result <- c(result, list(df))
+      }
+    } else if (is.list(value)) {
+      # Recursive call to handle further nested lists
+      nested_df <- flatten_list(value, new_parent_name)
+      result <- c(result, list(nested_df))
+    } else {
+      # If not a list, create a dataframe for the current value
+      df <- data.frame(
+        parent = new_parent_name,
+        metric = name,
+        value = value,
+        stringsAsFactors = FALSE
+      )
+      result <- c(result, list(df))
+    }
+  }
+  
+  # Combine all dataframes into one
+  return(do.call(rbind, result))
+}
+
+```
+
+```{r list to pdf}
+
+#' Function to export a nested list as a combined (single) PDF
+#' This function exports a list of plots into a single PDF. 
+#' It only works right now on a nest of 3 deep which is indicated by 'levels'.
+
+export_list_to_pdf <- function(plot_list, output_pdf = "col_plots.pdf", levels = 2) {
+  
+  # Create a PDF file to save plots
+  pdf(output_pdf, width = 8, height = 6)
+  
+  if(levels == 1) {
+    for (outer_key in names(plot_list)) {
+        plot <- plot_list[[outer_key]]
+        # Check if the element is a ggplot object and print it if true
+        if (inherits(plot, "ggplot")) {
+          suppressMessages(print(plot))
+      }
+    }
+  } 
+  
+  if(levels == 2) {
+      # Loop over each element in the nested list
+  for (outer_key in names(plot_list)) {
+    for (inner_key in names(plot_list[[outer_key]])) {
+      plot <- plot_list[[outer_key]][[inner_key]]
+      # Check if the element is a ggplot object and print it if true
+      if (inherits(plot, "ggplot")) {
+        suppressMessages(print(plot))
+      }
+    }
+  }
+  }
+  
+  if(levels == 3) {
+    # Loop over each element in the nested list
+  for (top_key in names(plot_list)) {
+    for (outer_key in names(plot_list[[top_key]])) {
+      for (inner_key in names(plot_list[[top_key]][[outer_key]])) {
+        plot <- plot_list[[top_key]][[outer_key]][[inner_key]]
+        # Check if the element is a ggplot object and print it if true
+        if (inherits(plot, "ggplot")) {
+          suppressMessages(print(plot))
+            }
+          }
+        }
+      }
+    }
+  
+  # Close the PDF device
+  dev.off()
+  
+  # Confirm completion
+  message("Plots have been saved to ", output_pdf)
+}
+
+
+```
+
+## Publication Plot Functions
+
+```{r Publication ready plots}
+
+library(ggplot2)
+library(ggpubr)
+
+# Function to apply publication theme easily to plots
+pub_plot_theme <- function(plot = NULL,width = 18, height = 8,angle = 45, 
+                           vjust = 1, hjust = 1) {
+  plot +
+    #makes the figure background white without grid lines
+    theme_classic() +
+    #below are theme settings that provide unlimited control of your figure and can be a template for other figures
+    #set the size, spacing, and color for the y-axis and x-axis titles
+    theme (axis.title.y = element_text(size = 10,  colour = "black"),
+           axis.title.x = element_text(size = 10,  colour = "black"),
+           #set the font type
+           text = element_text(family = "serif"),
+           #modify plot title, the B in this case
+           plot.title = element_text(face = "bold", family = "sans"),
+           #position the legend on the figure
+           legend.position = "bottom",
+           #adjust size of text for legend
+           legend.text = element_text(size = 8),
+           # Remove legend title
+           legend.title = element_blank(),
+           #margin for the plot
+           plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "cm"),
+           #set size of the tick marks for y-axis
+           axis.ticks.y = element_line(size = 0.5),
+           #set size of the tick marks for x-axis
+           axis.ticks.x = element_line(size = 0.5),
+           #adjust length of the tick marks
+           axis.ticks.length = unit(0.2,"cm"),
+           #set size and location of the tick labels for the y axis
+           axis.text.y = element_text(colour = "black", size = 10, angle = 0, vjust = 0.5, hjust = 1),
+           #set size and location of the tick labels for the x axis
+           axis.text.x = element_text(colour = "black", size = 10, angle = angle, vjust = vjust, hjust = hjust),
+           #set the axis size, color, and end shape
+           axis.line = element_line(colour = "black", size = 0.5, lineend = "square"))
+}
+
+# Updated function used to produce publication formatted plots using theme
+pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL, 
+                          file_name = NULL, file_type = ".pdf",
+                          width = 18, height = 8, units = "cm", dpi = 600, 
+                          angle = 45, vjust = 1, hjust = 1) {
+  
+  if(!is.list(plots)) {
+    stop("Plots must be entered as a list", 
+         call. = FALSE) 
+  }
+  
+  if(is.null(file_name)) {
+    stop("A file name must be specified", 
+         call. = FALSE)
+  }
+  
+  if(length(plots) > 1 && is.null(ncol) || is.null(nrow)) {
+    stop("If inputting 2 or more plots, must specify ncol and nrow.",
+         call. = FALSE)
+  }
+  
+  if(length(plots) == 1) {
+    
+    # annotated plot labels
+    ggplot_figure <- pub_plot_theme(plots[[1]], width = width, height = height, 
+                                    angle = angle, vjust = vjust, hjust = hjust) 
+    
+  }
+  
+  
+  if(length(plots) > 1) {
+    plot_list <- list()
+    for (i in 1:length(plots)) {
+      plot_label <- toupper(paste0(letters[i]))
+      plot_names <- paste0("plot_",i)
+       # annotated plot labels
+      plot_list[[plot_names]] <- pub_plot_theme(plots[[i]], width = width, height = height, 
+                             angle = angle, vjust = vjust, hjust = hjust) + 
+      ggtitle(label = plot_label)
+    }
+    
+    
+    #arragne the two plots side by side using the ggpubr package
+    ggplot_figure <- ggarrange(plotlist = plot_list, ncol = ncol, nrow = nrow)
+  }
+  
+  # #make ggplot figure that meets AFS style guidelines
+  # len_wt_afs <- ggplot(data = length_weight_data, aes(x = length, y = weight, fill = species)) +
+  # #set symbol shape and size
+  # geom_point(shape = 21, size = 2) +
+  # #set the limits and tick breaks for the y-axis
+  # scale_y_continuous (limits = c(0,2400), expand = c(0,0), breaks = seq(0,2400,400)) +
+  # #set the limits and tick spacing for the x-axis
+  # scale_x_continuous(limits = c(100,600), expand = c(0,0), breaks = seq(100,600,100)) +
+  # #adjust the order of the legend, make new labels, and select the symbol colors
+  # scale_fill_manual(limits = c("lmb", "cat"), labels = c("Largemouth Bass", "Channel Catfish"),
+  #       values = c("black", "white")) +
+  # #add legend title, but left blank here because we want a legend but no title
+  # labs(fill = "") +
+  
+  
+  
+  #save the plot as a .tiff as a very large file, which is publication quality
+  ggsave(ggplot_figure, file = paste0(file_name,file_type), width = width,
+         height = height, units = units, 
+         dpi = dpi)
+  
+}
+
+
+```
+
+## Parallel processing
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+
+library(future)
+library(foreach)
+library(doFuture)
+
+# Workers are the number of cores being used for parallel processing
+plan(multisession(workers = 6))
+
+# Initialize empty lists for 'combos', 'preds', and 'varimp' at the top level
+par_list <- list("combos" = list(), "preds" = list(), "varimp" = list())
+
+# Parallel processing code
+
+par_list <- foreach(i = steps, .combine = function(...) {
+  # Combine all elements into a list and use Reduce to merge them sequentially
+  Reduce(function(x, y) {
+    x$combos <- modifyList(x$combos, y$combos)
+    x$preds <- modifyList(x$preds, y$preds)
+    x$varimp <- modifyList(x$varimp, y$varimp)
+    return(x)}, 
+    list(...))}, 
+  .multicombine = TRUE, 
+  .init = placeholder, 
+  .errorhandling = "pass",
+  .options.future = list(globals = structure(TRUE, 
+                                           add = c("dat")), 
+                       seed = TRUE)) %dofuture% {
+                         
+                         gc()
+                         
+                    step <- as.character(i)
+       # Produces a list with 3 categories                  
+      placeholder <- day_combos(dat = dat,
+                                step = i)
+                         
+                         # Create a result structure for this iteration
+                    result <- list()
+                    result$combos <- list()
+                    result$preds <- list()
+                    result$varimp <- list()
+                         
+    # Assign values to the appropriate steps in 'combos', 'preds', and 'varimp'
+                    result$combos[[step]] <- placeholder$combos
+                    result$preds[[step]] <- placeholder$valid_pred_tests
+                    result$varimp[[step]] <- placeholder$var_imp
+                         
+                    return(result)
+                         
+                       }
+
+# Disables parallel processing sessions
+plan(sequential)
+
+
+
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
