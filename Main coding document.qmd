@@ -332,7 +332,7 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
 
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
 
-```{r}
+```{r parallel processing}
 
 library(future)
 library(foreach)
@@ -390,11 +390,253 @@ plan(sequential)
 
 ```
 
-You can add options to executable code like this
+## Modelling
 
-```{r}
-#| echo: false
-2 * 2
+```{r GLMMTMB}
+
+glmm <- glmmTMB::glmmTMB("Variable of interest" ~ "Explanatory variable" +
+                         "Explanatory variable" +
+# Applies random effect
+                         (1|"Variable for random effect") +
+# ou handles irregular time points to account for temporal autocorrelation
+                         ou("Temporal variable" + 0 | "Variable for random effect"),
+                         data = "dataframe", 
+                         family = Gamma(link = "log"), 
+                         na.action = "na.fail",
+# Optimizer (sometimes needs to be played around with for model convergence)
+                         control = glmmTMB::glmmTMBControl(optimizer=optim,
+                                            optArgs=list(method="BFGS")))
+
+
+
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r Bayesian}
+# Bayesian from Ch. 2 testing
+
+library(tidyverse)
+library(brms)
+library(shinystan)
+
+AR <- FALSE
+
+dat <- readRDS("data/summer_contour_cleaned.rds") |>
+  mutate(spawn = factor(ifelse(spawn == TRUE, "Y", "N")),
+         yr = as.integer(as.character(yr)))
+
+if (AR == TRUE) {
+  bf_area <- bf(sum_area ~ sex + fl_cm + spawn + mature +
+                  mean_temperature + mean_discharge + (1 |A| num_Fish_ID) +
+                  ar(time = yr, gr = num_Fish_ID, p = 1)) +
+    Gamma(link = "log") 
+  
+  bf_dist <- bf(dist_travel_km ~ sex + fl_cm + spawn + mature + 
+                  mean_temperature + mean_discharge + (1 |A| num_Fish_ID) + 
+                  + ar(time = yr, gr = num_Fish_ID, p = 1)) +
+    Gamma(link = "log")
+  
+  fit <- brm(bf_area + bf_dist, data = dat, 
+             control = list(adapt_delta = 0.99, max_treedepth = 15),
+             iter = 16000, warmup = 15000, chains = 4, cores = 4, init = 0,
+             prior = set_prior("gamma(1, 1)", class = "shape", 
+                               resp = c("sumarea", "disttravelkm")))
+} else {
+  bf_area <- bf(sum_area ~ sex + fl_cm + spawn + mature +
+                  mean_temperature + mean_discharge + (1 |A| num_Fish_ID)) +
+    Gamma(link = "log") 
+  
+  bf_dist <- bf(dist_travel_km ~ sex + fl_cm + spawn + mature +
+                  mean_temperature + mean_discharge + (1 |A| num_Fish_ID)) +
+    Gamma(link = "log")
+  
+  fit <- brm(bf_area + bf_dist, data = dat, 
+             control = list(adapt_delta = 0.9, max_treedepth = 12),
+             iter = 4000, chains = 4, cores = 4, init = 0)
+}
+
+summary(fit)
+launch_shinystan(fit)
+
+pp_check(fit, resp = "sumarea", ndraws = 1000)
+pp_check(fit, resp = "sumarea", type = "stat", stat = "mean", ndraws = 1000)
+pp_check(fit, resp = "sumarea", type = "stat", stat = "min", ndraws = 1000)
+pp_check(fit, resp = "sumarea", type = "stat", stat = "max", ndraws = 1000)
+
+pp_check(fit, resp = "disttravelkm", ndraws = 1000)
+pp_check(fit, resp = "disttravelkm", type = "stat", stat = "mean", ndraws = 1000)
+pp_check(fit, resp = "disttravelkm", type = "stat", stat = "min", ndraws = 1000)
+pp_check(fit, resp = "disttravelkm", type = "stat", stat = "max", ndraws = 1000)
+
+
+
+
+```
+
+## Mapping
+
+```{r interactive map}
+
+# From "Intro to R for Cassie"
+
+library(leaflet)
+library(leaflet.extras)
+library(htmltools)
+library(htmlwidgets)
+library(leafem)
+
+# Create a palate of colours for map based off of common names of beetles
+pal.beetle_name <- colorFactor(palette = "Set1", domain = dat_beetles_elevation$Common_name, reverse = T)
+
+# unique(dat_beetles_elevation$Common_name)
+
+# Needed to make a custom colour palate for factors greater than 11
+c25 <- c(
+  "dodgerblue2", "#E31A1C", 
+  "green4",
+  "#6A3D9A",
+  "#FF7F00",
+  "black", "gold1",
+  "skyblue2", "#FB9A99",
+  "palegreen2",
+  "#CAB2D6",
+  "#FDBF6F", 
+  "gray70", "khaki2",
+  "maroon", "orchid1", "deeppink1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown"
+)
+
+# Applying the custom colour palate to the unit number factors
+pal.beetle_unit <- colorFactor(palette = c25, domain = dat_beetles_elevation$unit_number, reverse = T)
+
+# Construct the interactive map for beetles across BC
+
+interactive_beetle_map <- leaflet(dat_beetles_elevation) %>% 
+  # These 4 lines of code add the base maps and mouse coordinates to the map.
+  # Each group will be clickable on the map to be swapped between (except mouse). 
+        addTiles(group = "OSM") %>% 
+        addProviderTiles("CartoDB", group = "Carto") %>% 
+        addProviderTiles("Esri", group = "Esri") %>%
+        addMouseCoordinates() %>%
+  # This part adds the circle markers to the map with popup bubbles for additional data. 
+        addCircleMarkers(data = dat_beetles_elevation, radius = 2, 
+                         group = dat_beetles_elevation$Common_name, color = ~pal.beetle_name(Common_name),
+                         popup = ~paste("Common name: ","<b>", Common_name, "</b>", "<br/>",
+                                         "Latin name:","<i>",Latin_name,"</i>", "<br/>",
+                                         "Species code:", species_code, "<br/>",
+                                         "Elevation: ", elevation,"m <br/>",
+                                         "Unit Number: ", unit_number, "<br/>"),
+                         label = ~htmlEscape(Common_name)) %>%
+        addCircleMarkers(data = dat_beetles_elevation, radius = 2, 
+                         group = "Unit Number", color = ~pal.beetle_unit(unit_number),
+                         popup = ~paste("Common name: ","<b>", Common_name, "</b>", "<br/>",
+                                         "Latin name:","<i>",Latin_name,"</i>", "<br/>",
+                                         "Species code:", species_code, "<br/>",
+                                         "Elevation: ", elevation,"m <br/>",
+                                         "Unit Number: ", unit_number, "<br/>"),
+                         label = ~htmlEscape(Common_name)) %>%
+  # This code adds the ability to toggle layers on and off while interacting with the map.
+        addLayersControl(baseGroups = c("OSM", "Carto", "Esri"), 
+                         overlayGroups = c(dat_beetles_elevation$Common_name, "Unit Number")) %>% 
+  # This adds a legend to the map
+        addLegend(position = "bottomright",
+            pal = pal.beetle_name, values = ~Common_name, opacity = 1, title = "Beetle Common Names", group = dat_beetles_elevation$Common_name) %>%
+        addLegend(position = "bottomleft",
+            pal = pal.beetle_unit, values = ~unit_number, opacity = 1, title = "Unit Names",group = "Unit Number") %>%
+  # A minimap helps the user identify where they are in respect to other geographical landmarks. 
+        addMiniMap(position = "topleft") %>%
+  # This determines where the user starts when viewing the map. 
+        setView(lat = 53.876, lng = -122.769 , zoom = 10)
+
+#saveWidget(interactive_beetle_map, file="interactive_beetle_map.html")
+
+
+```
+
+```{r}
+
+
+```
+
+## Environmental
+```{r weather from Envi Can}
+# Weather retreival from Canadian weather stations
+
+library(weathercan)
+stations_dl(verbose = T,quiet = T)
+castlegar_air <- weather_dl(station_ids = c(1106, 1105, 31067), 
+                                start = "2009-01-01", 
+                                end = "2019-12-31",
+                                interval = "day")
+
+```
+
+```{r Water use from USGS}
+
+# Water use data retrieval from USGS
+
+library(dataRetrieval)
+
+siteNumber <- "12399500"
+usgs_col_dis <- readNWISuv(siteNumbers = siteNumber,
+                     parameterCd = "00060",
+                     startDate = "2009-01-01",
+                     endDate = "2019-12-31",
+                     tz = "America/Vancouver") %>%
+  renameNWISColumns() 
+
+```
+
+## Indicies
+
+```{r Diversity Indicies}
+
+#From "Intro to R for Cassie"
+
+# Data needs to be in the form of a matrix
+# q and alpha can be set to anything but i think 2 and 0.5 are standard. 
+# Custom function using function() to make diversity formulas
+alpha_diversity <- function(data, q, alpha) {
+  p_ij <- data / rowSums(data)
+  p_ij[is.na(p_ij)] <- 0
+  p_i <- colSums(p_ij)
+  p_i[p_i == 0] <- 1 # Handle cases where all species are absent
+  p_i_given_j <- p_ij / matrix(p_i, nrow = nrow(p_ij), ncol = ncol(p_ij), byrow = TRUE)
+  div <- 1 / ((rowSums(p_ij * p_i_given_j^(q - 1)))^(1 / (q - 1)))
+  return(div^alpha)
+}
+
+# This gets us our alpha diversity based on our matrix of beetle totals per group.   
+diversity_alpha <- alpha_diversity(dat_beetle_counts,2,0.5)
+
+gamma_diversity <- function(data, q) {
+  p_i <- colSums(data) / sum(data)
+  sum_pq <- sum(p_i^q)
+  1 / (sum_pq ^ (1/(q-1)))
+}
+
+# This gets us our gamma diversity based on our matrix of beetle totals per group.  
+diversity_gamma <- gamma_diversity(dat_beetle_counts,2)
+
+# This gets us our betal diversity based on our alpha and gamma diversities.
+diversity_beta <- diversity_gamma/diversity_alpha
+
+# Compute species richness
+species_richness <- apply(dat_beetle_counts, 1, function(x) sum(x > 0))
+
+# Compute Simpson's index
+simpsons_index <- apply(dat_beetle_counts, 1, function(x) {
+  p <- x[x > 0] / sum(x)
+  1 - sum(p^2)
+})
+
+# Compute Shannon's index
+shannons_index <- apply(dat_beetle_counts, 1, function(x) {
+  p <- x[x > 0] / sum(x)
+  -sum(p * log2(p))
+})
+
+# Here we cbind() (column bind) our group names dataframe to our new data. Allows for a more informative dataframe in the end. 
+indexes <- as.data.frame(cbind(group_names = dat_beetle_group_names,species_richness,simpsons_index,shannons_index,diversity_alpha,diversity_beta))
+
+```
