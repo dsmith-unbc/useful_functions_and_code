@@ -37,7 +37,9 @@ write_to_file <- TRUE
 message_func <- function(...) {
   
   # Concatenate all '...' arguments into a single string
-  txt <- paste(..., collapse = " ")
+  txt <- paste("> ",...,"\n", collapse = " ")
+  
+  #' The "\n" is to denote a line break. Use this to break lines apart in a message. 
   
   # Look for 'file_name' in the global environment if not provided as an argument
   
@@ -72,9 +74,7 @@ message_func <- function(...) {
 }
 
 #' Example function
-message_func("> Starting daily cross-validation code_________________________",
-             "\n")
-#' The "\n" is to denote a line break. This could be incorporated into the function in the future. 
+message_func("Starting daily cross-validation code_________________________")
 
 #' This function can be combined with a timer function to denote how long something took to run.
 
@@ -90,8 +90,8 @@ t_end <- as.double(difftime(Sys.time(), t_start_master))
 t_unit <- units(difftime(Sys.time(), t_start_master))
 
 message_func("> Daily analysis finished in:",round(t_end,digits = 2),t_unit,"\n",
-        "   Setting 'run_cv_tests_daily' back to 'FALSE'","\n","\n")
-
+        "   Setting 'run_cv_tests_daily' back to 'FALSE'")
+#' The "\n" creates a line break and drops the next part of the message down one level.
 
 ```
 
@@ -561,6 +561,10 @@ interactive_beetle_map <- leaflet(dat_beetles_elevation) %>%
 ## Environmental
 ```{r weather from Envi Can}
 # Weather retreival from Canadian weather stations
+
+# install.packages("weathercan", 
+#                  repos = c("https://ropensci.r-universe.dev", 
+#                            "https://cloud.r-project.org"))
 
 library(weathercan)
 stations_dl(verbose = T,quiet = T)
