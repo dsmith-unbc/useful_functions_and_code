@@ -260,7 +260,7 @@ pub_plot_theme <- function(plot = NULL,width = 18, height = 8,angle = 45,
 pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL, 
                           file_name = NULL, file_type = ".pdf",
                           width = 18, height = 8, units = "cm", dpi = 600, 
-                          angle = 45, vjust = 1, hjust = 1) {
+                          angle = 45, vjust = 1, hjust = 1, name_override = F) {
   
   if(!is.list(plots)) {
     stop("Plots must be entered as a list", 
@@ -292,9 +292,12 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
       plot_label <- toupper(paste0(letters[i]))
       plot_names <- paste0("plot_",i)
        # annotated plot labels
-      plot_list[[plot_names]] <- pub_plot_theme(plots[[i]], width = width, height = height, 
-                             angle = angle, vjust = vjust, hjust = hjust) + 
-      ggtitle(label = plot_label)
+      plot_list[[plot_names]] <- pub_plot_theme(plots[[i]], width = width, 
+                                                height = height, 
+                             angle = angle, vjust = vjust, hjust = hjust)
+      if(name_override == FALSE) {
+     plot_list[[plot_names]] + 
+      ggtitle(label = plot_label) }
     }
     
     
