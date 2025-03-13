@@ -220,6 +220,7 @@ export_list_to_pdf <- function(plot_list, output_pdf = "col_plots.pdf", levels =
 library(ggplot2)
 library(ggpubr)
 
+
 # Function to apply publication theme easily to plots
 pub_plot_theme <- function(plot = NULL,width = 18, height = 8,angle = 45, 
                            vjust = 1, hjust = 1) {
@@ -291,15 +292,24 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
     for (i in 1:length(plots)) {
       plot_label <- toupper(paste0(letters[i]))
       plot_names <- paste0("plot_",i)
-       # annotated plot labels
+      # annotated plot labels
+      
+      if(name_override == FALSE) {
+        plot_list[[plot_names]] <- pub_plot_theme(plots[[i]], width = width, 
+                                                  height = height, 
+                                                  angle = angle, 
+                                                  vjust = vjust, 
+                                                  hjust = hjust) + 
+          ggtitle(label = plot_label) 
+      } 
+     else {
       plot_list[[plot_names]] <- pub_plot_theme(plots[[i]], width = width, 
                                                 height = height, 
-                             angle = angle, vjust = vjust, hjust = hjust)
-      if(name_override == FALSE) {
-     plot_list[[plot_names]] + 
-      ggtitle(label = plot_label) }
-    }
-    
+                                                angle = angle, 
+                                                vjust = vjust, 
+                                                hjust = hjust)
+     }
+      }
     
     #arragne the two plots side by side using the ggpubr package
     ggplot_figure <- ggarrange(plotlist = plot_list, ncol = ncol, nrow = nrow)
