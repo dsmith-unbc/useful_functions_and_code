@@ -273,7 +273,7 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
          call. = FALSE)
   }
   
-  if(length(plots) > 1 && is.null(ncol) || is.null(nrow)) {
+  if(length(plots) > 1 && (is.null(ncol) || is.null(nrow))) {
     stop("If inputting 2 or more plots, must specify ncol and nrow.",
          call. = FALSE)
   }
