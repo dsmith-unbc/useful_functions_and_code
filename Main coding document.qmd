@@ -268,26 +268,44 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
          call. = FALSE) 
   }
   
+  if(is.ggplot(plots)) {
+    gg_given <- TRUE
+    
+    message("Single GGplot object provided.")
+  } else {
+    gg_given <- FALSE
+  }
+  
   if(is.null(file_name)) {
     stop("A file name must be specified", 
          call. = FALSE)
   }
   
-  if(length(plots) > 1 && (is.null(ncol) || is.null(nrow))) {
+  if(length(plots) > 1 && (is.null(ncol) || is.null(nrow)) && gg_given == FALSE) {
     stop("If inputting 2 or more plots, must specify ncol and nrow.",
          call. = FALSE)
   }
   
-  if(length(plots) == 1) {
+  
+  
+  if(length(plots) == 1 | gg_given == TRUE) {
     
-    # annotated plot labels
-    ggplot_figure <- pub_plot_theme(plots[[1]], width = width, height = height, 
-                                    angle = angle, vjust = vjust, hjust = hjust) 
-    
+    if(gg_given == TRUE) {
+      ggplot_figure <- pub_plot_theme(plots, width = width, 
+                                      height = height, 
+                                      angle = angle, vjust = vjust, 
+                                      hjust = hjust)
+    } else {
+      # annotated plot labels
+      ggplot_figure <- pub_plot_theme(plots[[1]], width = width, 
+                                      height = height, 
+                                      angle = angle, vjust = vjust, 
+                                      hjust = hjust)
+    }
   }
   
   
-  if(length(plots) > 1) {
+  if(length(plots) > 1 && gg_given == FALSE) {
     plot_list <- list()
     for (i in 1:length(plots)) {
       plot_label <- toupper(paste0(letters[i]))
