@@ -359,6 +359,46 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
 
 ```
 
+### Ploting related code
+```{r Secondary ggplot axis for scaled values}
+# Get the mean and standard deviation for your data of interest
+discharge_mean <- attr(scale(dataframe$mean_discharge), "scaled:center")
+discharge_sd <- attr(scale(dataframe$mean_discharge), "scaled:scale")
+
+example_ggplot <- ggplot(dataframe, aes(scaled_discharge,
+                                        response)) +  
+  geom_point() 
+  scale_x_continuous(
+    name = "Average Discharge (scaled)",
+    sec.axis = sec_axis(
+      # Convert back to unscaled values
+      trans = ~ . * discharge_sd + discharge_mean,  
+      name = "Average Discharge (cms)"
+    )
+  ) 
+
+# Works with emmip from emmeans package to plot models
+
+library(emmeans)
+
+emmip(causal_area_discharge_spawnmove_tot, ~ scaled_discharge,
+      data = contour_dat_95_sum,
+      cov.reduce = range, 
+      type = "response", CIs = T, level = 0.95) + 
+  ggtitle(plot_title_wrapper("Total effect causal model for discharge and seasonal movement area")) +
+  xlab("Average Discharge (scaled)") + 
+  ylab("Predicted Response (log scaled)") +   
+  scale_x_continuous(
+    name = "Average Discharge (scaled)",
+    sec.axis = sec_axis(
+      trans = ~ . * discharge_sd + discharge_mean,  # Convert back to unscaled values
+      name = "Average Discharge (cms)"
+    )
+  )   
+
+```
+
+
 ## Parallel processing
 
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
