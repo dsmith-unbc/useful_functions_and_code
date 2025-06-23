@@ -8,10 +8,9 @@ editor: visual
 
 Libraries needed for functions.
 
-
 ### QOL Functions
 
-This contains the message function and time related code. 
+This contains the message function and time related code.
 
 ```{r Message function}
 
@@ -223,7 +222,14 @@ library(ggpubr)
 
 # Function to apply publication theme easily to plots
 pub_plot_theme <- function(plot = NULL,width = 18, height = 8,angle = 45, 
-                           vjust = 1, hjust = 1) {
+                           vjust = 1, hjust = 1, theme_override = F) {
+  
+  if(theme_override == TRUE) {
+    legend_override <- "none"
+  } else {
+    legend_override <- "bottom"
+  }
+  
   plot +
     #makes the figure background white without grid lines
     theme_classic() +
@@ -236,7 +242,7 @@ pub_plot_theme <- function(plot = NULL,width = 18, height = 8,angle = 45,
            #modify plot title, the B in this case
            plot.title = element_text(face = "bold", family = "sans"),
            #position the legend on the figure
-           legend.position = "bottom",
+           legend.position = legend_override,
            #adjust size of text for legend
            legend.text = element_text(size = 8),
            # Remove legend title
@@ -257,11 +263,15 @@ pub_plot_theme <- function(plot = NULL,width = 18, height = 8,angle = 45,
            axis.line = element_line(colour = "black", size = 0.5, lineend = "square"))
 }
 
+
+
+
 # Updated function used to produce publication formatted plots using theme
 pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL, 
                           file_name = NULL, file_type = ".pdf",
                           width = 18, height = 8, units = "cm", dpi = 600, 
-                          angle = 45, vjust = 1, hjust = 1, name_override = F) {
+                          angle = 45, vjust = 1, hjust = 1, name_override = F,
+                          theme_override = F) {
   
   if(!is.list(plots)) {
     stop("Plots must be entered as a list", 
@@ -294,13 +304,15 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
       ggplot_figure <- pub_plot_theme(plots, width = width, 
                                       height = height, 
                                       angle = angle, vjust = vjust, 
-                                      hjust = hjust)
+                                      hjust = hjust,
+                                      theme_override = theme_override)
     } else {
       # annotated plot labels
       ggplot_figure <- pub_plot_theme(plots[[1]], width = width, 
                                       height = height, 
                                       angle = angle, vjust = vjust, 
-                                      hjust = hjust)
+                                      hjust = hjust,
+                                      theme_override = theme_override)
     }
   }
   
@@ -317,17 +329,19 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
                                                   height = height, 
                                                   angle = angle, 
                                                   vjust = vjust, 
-                                                  hjust = hjust) + 
+                                                  hjust = hjust,
+                                                  theme_override = theme_override) + 
           ggtitle(label = plot_label) 
       } 
-     else {
-      plot_list[[plot_names]] <- pub_plot_theme(plots[[i]], width = width, 
-                                                height = height, 
-                                                angle = angle, 
-                                                vjust = vjust, 
-                                                hjust = hjust)
-     }
+      else {
+        plot_list[[plot_names]] <- pub_plot_theme(plots[[i]], width = width, 
+                                                  height = height, 
+                                                  angle = angle, 
+                                                  vjust = vjust, 
+                                                  hjust = hjust,
+                                                  theme_override = theme_override)
       }
+    }
     
     #arragne the two plots side by side using the ggpubr package
     ggplot_figure <- ggarrange(plotlist = plot_list, ncol = ncol, nrow = nrow)
@@ -360,6 +374,7 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
 ```
 
 ### Ploting related code
+
 ```{r Secondary ggplot axis for scaled values}
 # Get the mean and standard deviation for your data of interest
 discharge_mean <- attr(scale(dataframe$mean_discharge), "scaled:center")
@@ -397,7 +412,6 @@ emmip(causal_area_discharge_spawnmove_tot, ~ scaled_discharge,
   )   
 
 ```
-
 
 ## Parallel processing
 
@@ -630,6 +644,7 @@ interactive_beetle_map <- leaflet(dat_beetles_elevation) %>%
 ```
 
 ## Environmental
+
 ```{r weather from Envi Can}
 # Weather retreival from Canadian weather stations
 
