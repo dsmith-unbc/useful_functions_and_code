@@ -715,18 +715,35 @@ diversity_beta <- diversity_gamma/diversity_alpha
 species_richness <- apply(dat_beetle_counts, 1, function(x) sum(x > 0))
 
 # Compute Simpson's index
-simpsons_index <- apply(dat_beetle_counts, 1, function(x) {
+simpsons_index <- apply(site_animal_diversity, 1, function(x) {
+  p <- sum(x[x > 0] * (x[x > 0] - 1)) / (sum(x[x > 0]*(sum(x[x > 0]) - 1)))
+  1 - p
+})
+
+simpson_eveness <- apply(site_animal_diversity, 1, function(x) {
+  p <- sum(x[x > 0] * (x[x > 0] - 1)) / (sum(x[x > 0]*(sum(x[x > 0]) - 1)))
+  d <- 1/ (1 - p)
+  d_max <- length(x[x > 0])
+  d/d_max
+})
+
+eveness <- apply(site_animal_diversity, 1, function(x) {
   p <- x[x > 0] / sum(x)
-  1 - sum(p^2)
+  s <- -sum(p * log(p))
+  h_max <- log(length(x[x > 0]))
+  s/h_max
 })
 
 # Compute Shannon's index
-shannons_index <- apply(dat_beetle_counts, 1, function(x) {
+shannons_index <- apply(site_animal_diversity, 1, function(x) {
   p <- x[x > 0] / sum(x)
-  -sum(p * log2(p))
+  -sum(p * log(p))
 })
 
 # Here we cbind() (column bind) our group names dataframe to our new data. Allows for a more informative dataframe in the end. 
-indexes <- as.data.frame(cbind(group_names = dat_beetle_group_names,species_richness,simpsons_index,shannons_index,diversity_alpha,diversity_beta))
+indexes <- as.data.frame(cbind(group_names = diversity_group_names,
+                               species_richness,simpsons_index,simpson_eveness,
+                               eveness,shannons_index,diversity_alpha,
+                               diversity_beta))
 
 ```
