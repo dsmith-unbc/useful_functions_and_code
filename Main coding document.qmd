@@ -274,8 +274,16 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
                           theme_override = F) {
   
   if(!is.list(plots)) {
-    stop("Plots must be entered as a list", 
-         call. = FALSE) 
+    message("Single GGplot object provided.","\n",
+            "Converting to list.")
+    plots <- list(plot_1 = plots)
+    
+  }
+  
+  if(length(file_type) > 1) {
+    message("Multiple file types provided.","\n",
+            "Will export plots into ",length(file_type)," file formats.")
+    
   }
   
   if(is.ggplot(plots)) {
@@ -364,9 +372,21 @@ pub_plot_func <- function(plots = NULL, ncol = NULL, nrow = NULL,
   
   
   #save the plot as a .tiff as a very large file, which is publication quality
-  ggsave(ggplot_figure, file = paste0(file_name,file_type), width = width,
-         height = height, units = units, 
-         dpi = dpi)
+  
+  if(length(file_type) > 1) {
+    for(i in file_type){
+      ggsave(ggplot_figure, file = paste0(file_name,i), width = width,
+             height = height, units = units, 
+             dpi = dpi)
+    }
+
+    
+  } else {
+    ggsave(ggplot_figure, file = paste0(file_name,file_type), width = width,
+           height = height, units = units, 
+           dpi = dpi)
+  }
+
   
 }
 
