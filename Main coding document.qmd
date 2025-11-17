@@ -433,6 +433,55 @@ emmip(causal_area_discharge_spawnmove_tot, ~ scaled_discharge,
 
 ```
 
+```{r adding blank plot space to a ggplot figure so x-axis unintrupted}
+
+# Have your dataframe of interest you want to plot
+RC_fish_capture <- RC_fish %>% 
+  filter(`FishCaptured` == TRUE &
+           !type %in% c("road crossing","transmission crossing")) %>%
+  group_by(drainage,Type, Species) %>%
+  summarise(fish_tot = sum(Quantity))
+
+RC_fish_plot <- RC_fish_capture %>%
+  #make the column you will be facetting by a factor (can also be done above)
+  mutate(Species = as.factor(Species))
+
+# Create a new column with a "blank" in the form of a space put in as a factor level
+RC_fish_plot$new_spp <-  factor(RC_fish_plot$Species, 
+         levels=c(" ",levels(RC_fish_plot$Species)))
+
+fish_cap_plot <- ggplot(RC_fish_plot, 
+                        aes(drainage,fish_tot,fill = Type)) + 
+  geom_col(position = "dodge", width = 0.75) + 
+  facet_wrap(~new_spp, drop = F) + 
+  scale_y_log10() +
+  ylab("Total fish counted (log scale)") +
+  xlab("Drainage basin") +
+  scale_fill_brewer(palette = "Dark2")
+
+# Create a Grob
+
+fish_cap_plot_grob <- ggplotGrob(pub_plot_theme(fish_cap_plot, height = 20,
+                                               width = 20, angle = 45))
+
+# Filter the grob and put in a blank panel and strip (for facet name)
+
+fish_cap_plot_grob_filtered <- gtable::gtable_filter(
+    fish_cap_plot_grob,
+    "panel-1-1|strip-t-1-1",
+    invert = TRUE
+)
+
+# Draw out the grob and save it as a pdf or whatever filetype you want
+
+grid::grid.draw(fish_cap_plot_grob_filtered)
+
+pdf("Figures/fish_capture_plot_edited.pdf")
+grid::grid.draw(fish_cap_plot_grob_filtered)
+dev.off()
+
+```
+
 ## Parallel processing
 
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
